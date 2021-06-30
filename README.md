@@ -1,6 +1,6 @@
 # digipad
 
-A new Flutter application.
+The Cross-Platform Mobile Application for the Digipad Project - which will essentially allow the user to use a custom made stylus along with their phone as a replacement for a writing pad.
 
 ## Getting Started
 

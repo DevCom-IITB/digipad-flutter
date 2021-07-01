@@ -118,7 +118,7 @@ class DigiPainter extends CustomPainter{
     ..color = Colors.black
     ..strokeWidth = 3.0
     ..isAntiAlias = true;
-    for(var i =0; i<pts.length;i++){
+    for(var i =0; i<pts.length-1;i++){
       if(pts[i]!=Offset.zero&& pts[i+1]!=Offset.zero){
         canvas.drawLine(pts[i], pts[i+1], paint);
       }

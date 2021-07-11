@@ -14,3 +14,40 @@ A few resources to get you started if this is your first Flutter project:
 For help getting started with Flutter, view our
 [online documentation](https://flutter.dev/docs), which offers tutorials,
 samples, guidance on mobile development, and a full API reference.
+
+## Js Server code
+
+```
+const net = require('net');
+
+const server = net.createServer((socket) => {
+    console.log('client connected');
+
+    socket.on('data', (data) => {
+        console.log(data.toString());
+        if(data.toString()==="Hi"){
+            socket.write('hi!');
+        } else if(data.toString()==="Eraser"){
+            socket.write('I cannot erase on my side');
+        } else if(data.toString()==="Pencil"){
+            socket.write('I can draw');
+        }
+
+    });
+
+
+    socket.on('end', () => {
+        console.log('Client disconnected');
+    });
+});
+
+server.on('error', (err) => {
+    console.error(error);
+});
+
+server.listen(4567, () => {
+    console.log('opened server on', server.address());
+});
+
+
+```

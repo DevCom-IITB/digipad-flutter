@@ -1,5 +1,8 @@
+import 'dart:async';
 import 'dart:ffi';
 import 'dart:ui';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -24,6 +27,69 @@ class _DigiCanvasState extends State<DigiCanvas> {
 
   final pts = <Offset>[];
   bool isDrawing = true;
+  bool isConnected = false;
+  int port = 0;
+  var socket;
+  late StreamSubscription socketListener;
+
+  void comm() async {
+    socket = await Socket.connect('10.0.2.2', port);
+    print('Connected to: ${socket.remoteAddress.address}:${socket.remotePort}');
+
+    // listen for responses from the server
+    socketListener = socket.listen(
+
+      // handle data from the server
+      (Uint8List data) {
+        final serverResponse = String.fromCharCodes(data);
+        print('Server: $serverResponse');
+      },
+
+      // handle errors
+      onError: (error) {
+        print(error);
+        socket.destroy();
+      },
+
+      // handle server ending connection
+      onDone: () {
+        print('Server left.');
+        socket.destroy();
+      },
+    );
+
+    // send some messages to the server
+    sendMessage("Hi");
+  }
+
+  Future<void> sendMessage(String message) async {
+    print('Client: $message');
+    socket.write(message);
+    await Future.delayed(Duration(seconds: 2));
+  }
+
+  Future<dynamic> createAlertDialog(BuildContext context) {
+
+    TextEditingController controller = new TextEditingController();
+
+    return showDialog(context: context, builder: (context){
+      return AlertDialog(
+        title: Text("Port"),
+        content: TextField(
+          controller: controller,
+        ) ,
+        actions: <Widget>[
+          ElevatedButton(
+            onPressed: (){
+              Navigator.of(context).pop(controller.text.toString());
+
+            },
+            child: Text("Connect"),
+          )
+        ],
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +115,7 @@ class _DigiCanvasState extends State<DigiCanvas> {
               final localposition = renderbox.globalToLocal(details.globalPosition);
               if(isDrawing){
                 pts.add(localposition);
+                sendMessage(localposition.toString());
               }else{
                 for(var i=0;i<pts.length;i++ ){
                   if((pts[i]-localposition).distance<5) pts[i] = Offset.zero;
@@ -83,21 +150,36 @@ class _DigiCanvasState extends State<DigiCanvas> {
               IconButton(onPressed: () {
                 setState(() {
                   isDrawing = true;
+                  sendMessage("Pencil");
                 });
               }, icon: Icon(Icons.edit,size: 30,color: isDrawing?Colors.white:Colors.black,)),
               IconButton(onPressed: () {
                 setState(() {
                   isDrawing = false;
+                  sendMessage("Eraser");
                 });
               }, icon: Icon(Icons.auto_fix_high,size: 30,color: isDrawing?Colors.black:Colors.white,)),
               IconButton(onPressed: () {
                 setState(() {
                   pts.clear();
+                  socketListener.cancel();
+                  socket.destroy();
+                  isConnected = false;
                 });
               }, icon: Icon(Icons.clear,size: 30,)),
               IconButton(onPressed: () {
                 Navigator.pushNamed(context, '/settings');
               }, icon: Icon(Icons.settings,size: 30,)),
+              IconButton(onPressed: () {
+                createAlertDialog(context).then((value)  {
+                  setState(() {
+                    port = int.parse(value);
+                    comm();
+                    isConnected = true;
+                  });
+                } );
+
+              }, icon: Icon(Icons.bluetooth,size: 30,color: isConnected?Colors.white:Colors.black,)),
             ],
           ),
         ),

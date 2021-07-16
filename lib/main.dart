@@ -28,12 +28,13 @@ class _DigiCanvasState extends State<DigiCanvas> {
   final pts = <Offset>[];
   bool isDrawing = true;
   bool isConnected = false;
-  int port = 0;
+  String ipAddress = '10.0.2.2'; //default value for local host while using emulator
   var socket;
   late StreamSubscription socketListener;
 
+  //listen to the server
   void comm() async {
-    socket = await Socket.connect('10.0.2.2', port);
+    socket = await Socket.connect(ipAddress, 4567);
     print('Connected to: ${socket.remoteAddress.address}:${socket.remotePort}');
 
     // listen for responses from the server
@@ -62,6 +63,7 @@ class _DigiCanvasState extends State<DigiCanvas> {
     sendMessage("Hi");
   }
 
+  //send message to the server
   Future<void> sendMessage(String message) async {
     print('Client: $message');
     socket.write(message);
@@ -74,7 +76,7 @@ class _DigiCanvasState extends State<DigiCanvas> {
 
     return showDialog(context: context, builder: (context){
       return AlertDialog(
-        title: Text("Port"),
+        title: Text("IP Address"),
         content: TextField(
           controller: controller,
         ) ,
@@ -82,7 +84,6 @@ class _DigiCanvasState extends State<DigiCanvas> {
           ElevatedButton(
             onPressed: (){
               Navigator.of(context).pop(controller.text.toString());
-
             },
             child: Text("Connect"),
           )
@@ -150,20 +151,20 @@ class _DigiCanvasState extends State<DigiCanvas> {
               IconButton(onPressed: () {
                 setState(() {
                   isDrawing = true;
-                  sendMessage("Pencil");
+                  sendMessage("Pencil"); // send message to the server that pencil is selected
                 });
               }, icon: Icon(Icons.edit,size: 30,color: isDrawing?Colors.white:Colors.black,)),
               IconButton(onPressed: () {
                 setState(() {
                   isDrawing = false;
-                  sendMessage("Eraser");
+                  sendMessage("Eraser"); //send message to server that eraser is selected
                 });
               }, icon: Icon(Icons.auto_fix_high,size: 30,color: isDrawing?Colors.black:Colors.white,)),
               IconButton(onPressed: () {
                 setState(() {
                   pts.clear();
-                  socketListener.cancel();
-                  socket.destroy();
+                  socketListener.cancel(); //terminate listening to server
+                  socket.destroy(); //terminate socket connection
                   isConnected = false;
                 });
               }, icon: Icon(Icons.clear,size: 30,)),
@@ -173,7 +174,7 @@ class _DigiCanvasState extends State<DigiCanvas> {
               IconButton(onPressed: () {
                 createAlertDialog(context).then((value)  {
                   setState(() {
-                    port = int.parse(value);
+                    ipAddress = value;
                     comm();
                     isConnected = true;
                   });

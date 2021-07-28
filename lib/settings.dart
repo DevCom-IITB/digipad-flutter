@@ -5,6 +5,8 @@ class Settings extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    //TODO Make latency slider
+    //TODO Set device name
     return Scaffold(
       appBar: AppBar(
         title: Text("Settings"),

@@ -3,6 +3,7 @@ import 'dart:ffi';
 import 'dart:ui';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -26,7 +27,7 @@ class DigiCanvas extends StatefulWidget {
 
 class _DigiCanvasState extends State<DigiCanvas> {
   final pts = <Offset>[];
-  bool isDrawing = true;
+  bool isDrawing = false;
   bool isConnected = false;
   String ipAddress =
       '192.168.1.6'; //default value for local host while using emulator
@@ -59,15 +60,13 @@ class _DigiCanvasState extends State<DigiCanvas> {
       },
     );
 
-    // send some messages to the server
-    sendMessage("Hi");
   }
 
   //send message to the server
   Future<void> sendMessage(String message) async {
     print('Client: $message');
     socket.write(message);
-    await Future.delayed(Duration(seconds: 2));
+    await Future.delayed(Duration(milliseconds:100 ));
   }
 
   Future<dynamic> createAlertDialog(BuildContext context) {
@@ -104,28 +103,47 @@ class _DigiCanvasState extends State<DigiCanvas> {
               final localposition =
                   renderbox.globalToLocal(details.globalPosition);
               if (isDrawing) {
-                pts.add(localposition);
+                //pts.add(localposition);
               } else {
-                for (var i = 0; i < pts.length; i++) {
-                  if ((pts[i] - localposition).distance < 5)
-                    pts[i] = Offset.zero;
-                }
+                // for (var i = 0; i < pts.length; i++) {
+                //   if ((pts[i] - localposition).distance < 5)
+                //     pts[i] = Offset.zero;
+                // }
               }
             });
           },
+          onDoubleTap: (){
+            var message = {
+              "action":"click",
+              "dx":0,
+              "dy":0
+            };
+            var jsonMessage = json.encode(message);
+            sendMessage(jsonMessage);
+
+          },
           onPanUpdate: (details) {
             setState(() {
-              final renderbox = context.findRenderObject() as RenderBox;
-              final localposition =
-                  renderbox.globalToLocal(details.globalPosition);
+              final renderBox = context.findRenderObject() as RenderBox;
+              final localPosition =
+                  renderBox.globalToLocal(details.globalPosition);
               if (isDrawing) {
-                pts.add(localposition);
-                sendMessage((localposition.dx/renderbox.size.width).toString() + ',' + (localposition.dy/renderbox.size.height).toString());
+                var message = {
+                  "action":"drag",
+                  "dx":(localPosition.dx/renderBox.size.width),
+                  "dy":(localPosition.dy/renderBox.size.height)
+                };
+                var jsonMessage = json.encode(message);
+                sendMessage(jsonMessage);
               } else {
-                for (var i = 0; i < pts.length; i++) {
-                  if ((pts[i] - localposition).distance < 5)
-                    pts[i] = Offset.zero;
-                }
+                var message = {
+                  "action":"move",
+                  "dx":(localPosition.dx/renderBox.size.width),
+                  "dy":(localPosition.dy/renderBox.size.height)
+                };
+                var jsonMessage = json.encode(message);
+                sendMessage(jsonMessage);
+
               }
             });
           },
@@ -155,41 +173,13 @@ class _DigiCanvasState extends State<DigiCanvas> {
               IconButton(
                   onPressed: () {
                     setState(() {
-                      isDrawing = true;
-                      sendMessage(
-                          "Pencil"); // send message to the server that pencil is selected
+                      isDrawing = !isDrawing;
                     });
                   },
                   icon: Icon(
                     Icons.edit,
                     size: 30,
                     color: isDrawing ? Colors.white : Colors.black,
-                  )),
-              IconButton(
-                  onPressed: () {
-                    setState(() {
-                      isDrawing = false;
-                      sendMessage(
-                          "Eraser"); //send message to server that eraser is selected
-                    });
-                  },
-                  icon: Icon(
-                    Icons.auto_fix_high,
-                    size: 30,
-                    color: isDrawing ? Colors.black : Colors.white,
-                  )),
-              IconButton(
-                  onPressed: () {
-                    setState(() {
-                      pts.clear();
-                      socketListener.cancel(); //terminate listening to server
-                      socket.destroy(); //terminate socket connection
-                      isConnected = false;
-                    });
-                  },
-                  icon: Icon(
-                    Icons.clear,
-                    size: 30,
                   )),
               IconButton(
                   onPressed: () {
@@ -201,13 +191,23 @@ class _DigiCanvasState extends State<DigiCanvas> {
                   )),
               IconButton(
                   onPressed: () {
-                    createAlertDialog(context).then((value) {
+                    if(isConnected){
                       setState(() {
-                        ipAddress = value;
-                        comm();
-                        isConnected = true;
+                        socketListener.cancel(); //terminate listening to server
+                        socket.destroy(); //terminate socket connection
+                        // pts.clear();
+                        isConnected = false;
                       });
-                    });
+
+                    }else{
+                      createAlertDialog(context).then((value) {
+                        setState(() {
+                          ipAddress = value;
+                          comm();
+                          isConnected = true;
+                        });
+                      });
+                    }
                   },
                   icon: Icon(
                     Icons.bluetooth,

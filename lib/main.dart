@@ -120,7 +120,7 @@ class _DigiCanvasState extends State<DigiCanvas> {
                   renderbox.globalToLocal(details.globalPosition);
               if (isDrawing) {
                 pts.add(localposition);
-                sendMessage(localposition.toString());
+                sendMessage((localposition.dx/renderbox.size.width).toString() + ',' + (localposition.dy/renderbox.size.height).toString());
               } else {
                 for (var i = 0; i < pts.length; i++) {
                   if ((pts[i] - localposition).distance < 5)

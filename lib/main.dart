@@ -64,6 +64,7 @@ class _DigiCanvasState extends State<DigiCanvas> {
 
   //send message to the server
   Future<void> sendMessage(String message) async {
+    message = message + '#';
     print('Client: $message');
     socket.write(message);
     await Future.delayed(Duration(milliseconds:100 ));
@@ -103,12 +104,7 @@ class _DigiCanvasState extends State<DigiCanvas> {
               final localposition =
                   renderbox.globalToLocal(details.globalPosition);
               if (isDrawing) {
-                //pts.add(localposition);
-              } else {
-                // for (var i = 0; i < pts.length; i++) {
-                //   if ((pts[i] - localposition).distance < 5)
-                //     pts[i] = Offset.zero;
-                // }
+                pts.add(localposition);
               }
             });
           },
@@ -127,29 +123,32 @@ class _DigiCanvasState extends State<DigiCanvas> {
               final renderBox = context.findRenderObject() as RenderBox;
               final localPosition =
                   renderBox.globalToLocal(details.globalPosition);
+              var dx = localPosition.dx/renderBox.size.width;
+              var dy = localPosition.dy/renderBox.size.height;
               if (isDrawing) {
+                pts.add(localPosition);
                 var message = {
                   "action":"drag",
-                  "dx":(localPosition.dx/renderBox.size.width),
-                  "dy":(localPosition.dy/renderBox.size.height)
+                  "dx":dx,
+                  "dy":dy
                 };
                 var jsonMessage = json.encode(message);
                 sendMessage(jsonMessage);
               } else {
                 var message = {
                   "action":"move",
-                  "dx":(localPosition.dx/renderBox.size.width),
-                  "dy":(localPosition.dy/renderBox.size.height)
+                  "dx":dx,
+                  "dy":dy
                 };
                 var jsonMessage = json.encode(message);
                 sendMessage(jsonMessage);
-
               }
             });
           },
           onPanEnd: (details) {
             setState(() {
               pts.add(Offset.zero);
+
             });
           },
           child: CustomPaint(
@@ -229,8 +228,8 @@ class DigiPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.black
-      ..strokeWidth = 3.0
+      ..color = Colors.green
+      ..strokeWidth = 5.0
       ..isAntiAlias = true;
     for (var i = 0; i < pts.length - 1; i++) {
       if (pts[i] != Offset.zero && pts[i + 1] != Offset.zero) {

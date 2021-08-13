@@ -6,8 +6,10 @@ import 'dart:typed_data';
 import 'dart:convert';
 
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:digipad/settings.dart';
+import 'package:digipad/socket_manager.dart';
 
 void main() {
   runApp(MaterialApp(
@@ -33,6 +35,7 @@ class _DigiCanvasState extends State<DigiCanvas> {
       '192.168.1.6'; //default value for local host while using emulator
   var socket;
   late StreamSubscription socketListener;
+  late SocketManager _socketManager;
 
   //listen to the server
   void comm() async {
@@ -60,6 +63,31 @@ class _DigiCanvasState extends State<DigiCanvas> {
       },
     );
 
+  }
+
+  String clickMessageEncoder(String action){
+    var message = {
+      "action": action
+    };
+    var jsonMessage = json.encode(message);
+    return jsonMessage ;
+  }
+  String moveMessageEncoder(String action, double dx, double dy){
+    var message = {
+      "action":action,
+      "dx":dx,
+      "dy":dy
+    };
+    var jsonMessage = json.encode(message);
+    return jsonMessage ;
+  }
+  String zoomMessageEncoder(String action, double scale){
+    var message = {
+      "action":action,
+      "dx":scale
+    };
+    var jsonMessage = json.encode(message);
+    return jsonMessage ;
   }
 
   //send message to the server
@@ -108,16 +136,6 @@ class _DigiCanvasState extends State<DigiCanvas> {
               }
             });
           },
-          onDoubleTap: (){
-            var message = {
-              "action":"click",
-              "dx":0,
-              "dy":0
-            };
-            var jsonMessage = json.encode(message);
-            sendMessage(jsonMessage);
-
-          },
           onPanUpdate: (details) {
             setState(() {
               final renderBox = context.findRenderObject() as RenderBox;
@@ -127,20 +145,10 @@ class _DigiCanvasState extends State<DigiCanvas> {
               var dy = localPosition.dy/renderBox.size.height;
               if (isDrawing) {
                 pts.add(localPosition);
-                var message = {
-                  "action":"drag",
-                  "dx":dx,
-                  "dy":dy
-                };
-                var jsonMessage = json.encode(message);
+                var jsonMessage = moveMessageEncoder("drag", dx, dy);
                 sendMessage(jsonMessage);
               } else {
-                var message = {
-                  "action":"move",
-                  "dx":dx,
-                  "dy":dy
-                };
-                var jsonMessage = json.encode(message);
+                var jsonMessage = moveMessageEncoder("move", dx, dy);
                 sendMessage(jsonMessage);
               }
             });
@@ -148,9 +156,17 @@ class _DigiCanvasState extends State<DigiCanvas> {
           onPanEnd: (details) {
             setState(() {
               pts.add(Offset.zero);
-
             });
           },
+          onDoubleTap: (){
+            var jsonMessage = clickMessageEncoder("right-click");
+            sendMessage(jsonMessage);
+          },
+          onTap: (){
+            var jsonMessage = clickMessageEncoder("left-click");
+            sendMessage(jsonMessage);
+          },
+
           child: CustomPaint(
             painter: DigiPainter(pts),
             child: Container(
@@ -180,6 +196,16 @@ class _DigiCanvasState extends State<DigiCanvas> {
                     size: 30,
                     color: isDrawing ? Colors.white : Colors.black,
                   )),
+              IconButton(
+                  onPressed: () {
+                    var jsonMessage = clickMessageEncoder("reset");
+                    sendMessage(jsonMessage);
+                  },
+                  icon: Icon(
+                    Icons.clear,
+                    size: 30,
+                  )
+              ),
               IconButton(
                   onPressed: () {
                     Navigator.pushNamed(context, '/settings');
@@ -215,6 +241,8 @@ class _DigiCanvasState extends State<DigiCanvas> {
                   )),
             ],
           ),
+
+
         ),
       ),
     );
@@ -244,4 +272,8 @@ class DigiPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) {
     return true;
   }
+}
+
+class MultiTouchDragRecognizer extends MultiTapGestureRecognizer {
+
 }

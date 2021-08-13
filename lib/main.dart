@@ -37,10 +37,24 @@ class _DigiCanvasState extends State<DigiCanvas> {
   late StreamSubscription socketListener;
   late SocketManager _socketManager;
 
+  void sendInitialData(){
+    //Kaustav's edit -
+    //sending an initial message to the server about phone details (width and height)
+    var message = {
+        "action":"initialize",
+        "mobileWidth": (MediaQuery.of(context).size.width).toString(),
+        "mobileHeight": (MediaQuery.of(context).size.height).toString(),
+      };
+    var jsonMessage = json.encode(message);
+    sendMessage(jsonMessage);
+  }
+
   //listen to the server
   void comm() async {
     socket = await Socket.connect(ipAddress, 4567);
     print('Connected to: ${socket.remoteAddress.address}:${socket.remotePort}');
+
+    sendInitialData();
 
     // listen for responses from the server
     socketListener = socket.listen(
@@ -127,6 +141,7 @@ class _DigiCanvasState extends State<DigiCanvas> {
       backgroundColor: Colors.redAccent[100],
       body: GestureDetector(
           onPanStart: (details) {
+            sendInitialData(); //Didn't know how to detect orientation change, so i did this - Kaustav
             setState(() {
               final renderbox = context.findRenderObject() as RenderBox;
               final localposition =

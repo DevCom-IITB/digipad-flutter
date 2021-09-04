@@ -35,7 +35,9 @@ class _DigiCanvasState extends State<DigiCanvas> {
       '192.168.1.6'; //default value for local host while using emulator
   var socket;
   late StreamSubscription socketListener;
-  late SocketManager _socketManager;
+  String JSONmessage = "";
+  Timer? _timer;
+  int timerStep = 0;
 
   void sendInitialData(){
     //Kaustav's edit -
@@ -108,8 +110,14 @@ class _DigiCanvasState extends State<DigiCanvas> {
   Future<void> sendMessage(String message) async {
     message = message + '#';
     print('Client: $message');
-    socket.write(message);
-    await Future.delayed(Duration(milliseconds:100 ));
+    JSONmessage = JSONmessage + message;
+    if(timerStep>10){
+      socket.write(JSONmessage);
+      JSONmessage = "";
+      timerStep = 0;
+      await Future.delayed(Duration(milliseconds:100 ));
+    }
+
   }
 
   Future<dynamic> createAlertDialog(BuildContext context) {
@@ -142,6 +150,12 @@ class _DigiCanvasState extends State<DigiCanvas> {
       body: GestureDetector(
           onPanStart: (details) {
             sendInitialData(); //Didn't know how to detect orientation change, so i did this - Kaustav
+            //TODO Start timer
+            if(_timer==null){
+              _timer = Timer.periodic(Duration(milliseconds: 10), (timer) {
+                timerStep++;
+              });
+            }
             setState(() {
               final renderbox = context.findRenderObject() as RenderBox;
               final localposition =
@@ -170,7 +184,10 @@ class _DigiCanvasState extends State<DigiCanvas> {
           },
           onPanEnd: (details) {
             setState(() {
-              pts.add(Offset.zero);
+              pts.clear();
+              if(_timer==null){
+                _timer!.cancel();
+              }
             });
           },
           onDoubleTap: (){

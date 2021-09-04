@@ -30,6 +30,7 @@ class DigiCanvas extends StatefulWidget {
 class _DigiCanvasState extends State<DigiCanvas> {
   final pts = <Offset>[];
   bool isDrawing = false;
+  bool isScreenMoving = false;
   bool isConnected = false;
   String ipAddress =
       '192.168.1.6'; //default value for local host while using emulator
@@ -157,12 +158,16 @@ class _DigiCanvasState extends State<DigiCanvas> {
               });
             }
             setState(() {
-              final renderbox = context.findRenderObject() as RenderBox;
-              final localposition =
-                  renderbox.globalToLocal(details.globalPosition);
+              final renderBox = context.findRenderObject() as RenderBox;
+              final localPosition =
+                  renderBox.globalToLocal(details.globalPosition);
               if (isDrawing) {
-                pts.add(localposition);
+                pts.add(localPosition);
               }
+              var dx = localPosition.dx/renderBox.size.width;
+              var dy = localPosition.dy/renderBox.size.height;
+              var jsonMessage = moveMessageEncoder("move", dx, dy);
+              sendMessage(jsonMessage);
             });
           },
           onPanUpdate: (details) {
@@ -176,7 +181,11 @@ class _DigiCanvasState extends State<DigiCanvas> {
                 pts.add(localPosition);
                 var jsonMessage = moveMessageEncoder("drag", dx, dy);
                 sendMessage(jsonMessage);
-              } else {
+              } else if(isScreenMoving){
+                var jsonMessage = moveMessageEncoder("screen", dx, dy);
+                sendMessage(jsonMessage);
+              }
+              else {
                 var jsonMessage = moveMessageEncoder("move", dx, dy);
                 sendMessage(jsonMessage);
               }
@@ -230,12 +239,15 @@ class _DigiCanvasState extends State<DigiCanvas> {
                   )),
               IconButton(
                   onPressed: () {
-                    var jsonMessage = clickMessageEncoder("reset");
-                    sendMessage(jsonMessage);
+                    setState(() {
+                      isDrawing = false;
+                      isScreenMoving =!isScreenMoving;
+                    });
                   },
                   icon: Icon(
-                    Icons.clear,
+                    Icons.fit_screen,
                     size: 30,
+                    color: isScreenMoving ? Colors.white : Colors.black,
                   )
               ),
               IconButton(
@@ -304,8 +316,4 @@ class DigiPainter extends CustomPainter {
   bool shouldRepaint(covariant CustomPainter oldDelegate) {
     return true;
   }
-}
-
-class MultiTouchDragRecognizer extends MultiTapGestureRecognizer {
-
 }

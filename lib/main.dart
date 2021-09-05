@@ -111,13 +111,13 @@ class _DigiCanvasState extends State<DigiCanvas> {
   Future<void> sendMessage(String message) async {
     message = message + '#';
     print('Client: $message');
-    JSONmessage = JSONmessage + message;
-    if(timerStep>10){
-      socket.write(JSONmessage);
-      JSONmessage = "";
-      timerStep = 0;
+    //JSONmessage = JSONmessage + message;
+    //if(timerStep>10){
+      socket.write(message);
+      //JSONmessage = "";
+      //timerStep = 0;
       await Future.delayed(Duration(milliseconds:100 ));
-    }
+    //}
 
   }
 
@@ -152,11 +152,11 @@ class _DigiCanvasState extends State<DigiCanvas> {
           onPanStart: (details) {
             sendInitialData(); //Didn't know how to detect orientation change, so i did this - Kaustav
             //TODO Start timer
-            if(_timer==null){
-              _timer = Timer.periodic(Duration(milliseconds: 10), (timer) {
-                timerStep++;
-              });
-            }
+            // if(_timer==null){
+            //   _timer = Timer.periodic(Duration(milliseconds: 10), (timer) {
+            //     timerStep++;
+            //   });
+            // }
             setState(() {
               final renderBox = context.findRenderObject() as RenderBox;
               final localPosition =
@@ -194,9 +194,9 @@ class _DigiCanvasState extends State<DigiCanvas> {
           onPanEnd: (details) {
             setState(() {
               pts.clear();
-              if(_timer==null){
-                _timer!.cancel();
-              }
+              // if(_timer==null){
+              //   _timer!.cancel();
+              // }
             });
           },
           onDoubleTap: (){
@@ -229,7 +229,13 @@ class _DigiCanvasState extends State<DigiCanvas> {
               IconButton(
                   onPressed: () {
                     setState(() {
-                      isDrawing = !isDrawing;
+                      if(!isScreenMoving){
+                        isDrawing = !isDrawing;
+                      }else{
+                        isDrawing = true;
+                        isScreenMoving = false;
+                      }
+
                     });
                   },
                   icon: Icon(

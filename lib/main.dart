@@ -27,7 +27,31 @@ class DigiCanvas extends StatefulWidget {
   _DigiCanvasState createState() => _DigiCanvasState();
 }
 
-class _DigiCanvasState extends State<DigiCanvas> {
+class _DigiCanvasState extends State<DigiCanvas> with WidgetsBindingObserver {
+
+  // Automatic detection of orientation change to change window size in desktop
+  @override
+  void didChangeMetrics() {
+    WidgetsBinding.instance?.addPostFrameCallback((timeStamp) {
+      setState(() {
+        messageManager("initialize");
+      });
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    print("init");
+    WidgetsBinding.instance?.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance?.removeObserver(this);
+    super.dispose();
+  }
+
   final pts = <Offset>[];
   bool isDrawing = false;
   bool isScreenMoving = false;
@@ -40,14 +64,36 @@ class _DigiCanvasState extends State<DigiCanvas> {
   Timer? _timer;
   int timerStep = 0;
 
-  void sendInitialData(){
-    //Kaustav's edit -
-    //sending an initial message to the server about phone details (width and height)
-    var message = {
-        "action":"initialize",
-        "mobileWidth": (MediaQuery.of(context).size.width).toString(),
-        "mobileHeight": (MediaQuery.of(context).size.height).toString(),
-      };
+  void messageManager(String action,[double? dx, double? dy]){
+    var message;
+    switch(action){
+      case "initialize":
+        message = {
+          "action":action,
+          "mobileWidth": (MediaQuery.of(context).size.width).toString(),
+          "mobileHeight": (MediaQuery.of(context).size.height).toString(),
+        };
+        break;
+      case "right-click":
+      case "left-click":
+        message = {
+          "action": action
+        };
+        break;
+      case "zoom":
+        message = {
+          "action":action,
+          "dx":dx
+        };
+        break;
+      default: //Move commands
+        message = {
+          "action":action,
+          "dx":dx,
+          "dy":dy
+        };
+        break;
+    }
     var jsonMessage = json.encode(message);
     sendMessage(jsonMessage);
   }
@@ -57,7 +103,8 @@ class _DigiCanvasState extends State<DigiCanvas> {
     socket = await Socket.connect(ipAddress, 4567);
     print('Connected to: ${socket.remoteAddress.address}:${socket.remotePort}');
 
-    sendInitialData();
+    //sendInitialData();
+    messageManager("initialize");
 
     // listen for responses from the server
     socketListener = socket.listen(
@@ -80,31 +127,6 @@ class _DigiCanvasState extends State<DigiCanvas> {
       },
     );
 
-  }
-
-  String clickMessageEncoder(String action){
-    var message = {
-      "action": action
-    };
-    var jsonMessage = json.encode(message);
-    return jsonMessage ;
-  }
-  String moveMessageEncoder(String action, double dx, double dy){
-    var message = {
-      "action":action,
-      "dx":dx,
-      "dy":dy
-    };
-    var jsonMessage = json.encode(message);
-    return jsonMessage ;
-  }
-  String zoomMessageEncoder(String action, double scale){
-    var message = {
-      "action":action,
-      "dx":scale
-    };
-    var jsonMessage = json.encode(message);
-    return jsonMessage ;
   }
 
   //send message to the server
@@ -147,10 +169,10 @@ class _DigiCanvasState extends State<DigiCanvas> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      extendBody: true,
       backgroundColor: Colors.redAccent[100],
       body: GestureDetector(
           onPanStart: (details) {
-            sendInitialData(); //Didn't know how to detect orientation change, so i did this - Kaustav
             //TODO Start timer
             // if(_timer==null){
             //   _timer = Timer.periodic(Duration(milliseconds: 10), (timer) {
@@ -166,8 +188,7 @@ class _DigiCanvasState extends State<DigiCanvas> {
               }
               var dx = localPosition.dx/renderBox.size.width;
               var dy = localPosition.dy/renderBox.size.height;
-              var jsonMessage = moveMessageEncoder("move", dx, dy);
-              sendMessage(jsonMessage);
+              messageManager("move",dx,dy);
             });
           },
           onPanUpdate: (details) {
@@ -179,33 +200,28 @@ class _DigiCanvasState extends State<DigiCanvas> {
               var dy = localPosition.dy/renderBox.size.height;
               if (isDrawing) {
                 pts.add(localPosition);
-                var jsonMessage = moveMessageEncoder("drag", dx, dy);
-                sendMessage(jsonMessage);
+                messageManager("drag",dx,dy);
               } else if(isScreenMoving){
-                var jsonMessage = moveMessageEncoder("screen", dx, dy);
-                sendMessage(jsonMessage);
+                messageManager("screen",dx,dy);
               }
               else {
-                var jsonMessage = moveMessageEncoder("move", dx, dy);
-                sendMessage(jsonMessage);
+                messageManager("move",dx,dy);
               }
             });
           },
           onPanEnd: (details) {
             setState(() {
-              pts.clear();
+              pts.add(Offset.zero);
               // if(_timer==null){
               //   _timer!.cancel();
               // }
             });
           },
           onDoubleTap: (){
-            var jsonMessage = clickMessageEncoder("right-click");
-            sendMessage(jsonMessage);
+            messageManager("right-click");
           },
           onTap: (){
-            var jsonMessage = clickMessageEncoder("left-click");
-            sendMessage(jsonMessage);
+            messageManager("left-click");
           },
 
           child: CustomPaint(
@@ -215,86 +231,91 @@ class _DigiCanvasState extends State<DigiCanvas> {
               width: MediaQuery.of(context).size.width,
             ),
           )),
-      bottomNavigationBar: Padding(
-        padding: EdgeInsets.all(15.0),
-        child: Container(
-          decoration: BoxDecoration(
-              borderRadius: BorderRadius.all(Radius.circular(8)),
-              color: Colors.blue[500]),
-          padding: EdgeInsets.all(10.0),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: <Widget>[
-              IconButton(
-                  onPressed: () {
-                    setState(() {
-                      if(!isScreenMoving){
-                        isDrawing = !isDrawing;
-                      }else{
-                        isDrawing = true;
-                        isScreenMoving = false;
-                      }
-
-                    });
-                  },
-                  icon: Icon(
-                    Icons.edit,
-                    size: 30,
-                    color: isDrawing ? Colors.white : Colors.black,
-                  )),
-              IconButton(
-                  onPressed: () {
-                    setState(() {
-                      isDrawing = false;
-                      isScreenMoving =!isScreenMoving;
-                    });
-                  },
-                  icon: Icon(
-                    Icons.fit_screen,
-                    size: 30,
-                    color: isScreenMoving ? Colors.white : Colors.black,
-                  )
-              ),
-              IconButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/settings');
-                  },
-                  icon: Icon(
-                    Icons.settings,
-                    size: 30,
-                  )),
-              IconButton(
-                  onPressed: () {
-                    if(isConnected){
-                      setState(() {
-                        socketListener.cancel(); //terminate listening to server
-                        socket.destroy(); //terminate socket connection
-                        // pts.clear();
-                        isConnected = false;
-                      });
-
-                    }else{
-                      createAlertDialog(context).then((value) {
+      bottomNavigationBar: FractionallySizedBox(
+        widthFactor: MediaQuery.of(context).orientation == Orientation.portrait ? 1:0.4,
+        alignment: Alignment.bottomLeft,
+        child: Padding(
+            padding: EdgeInsets.all(15.0),
+            child: Container(
+              decoration: BoxDecoration(
+                  borderRadius: BorderRadius.all(Radius.circular(8)),
+                  color: Colors.blue[500]),
+              padding: EdgeInsets.all(MediaQuery.of(context).orientation == Orientation.portrait ? 10:5),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: <Widget>[
+                  IconButton(
+                      onPressed: () {
                         setState(() {
-                          ipAddress = value;
-                          comm();
-                          isConnected = true;
+                          if(!isScreenMoving){
+                            isDrawing = !isDrawing;
+                            pts.clear();
+                          }else{
+                            isDrawing = true;
+                            isScreenMoving = false;
+                          }
                         });
-                      });
-                    }
-                  },
-                  icon: Icon(
-                    Icons.bluetooth,
-                    size: 30,
-                    color: isConnected ? Colors.white : Colors.black,
-                  )),
-            ],
-          ),
+                      },
+                      icon: Icon(
+                        Icons.edit,
+                        size: 30,
+                        color: isDrawing ? Colors.white : Colors.black,
+                      )),
+                  IconButton(
+                      onPressed: () {
+                        setState(() {
+                          isDrawing = false;
+                          isScreenMoving =!isScreenMoving;
+                          pts.clear();
+                        });
+                      },
+                      icon: Icon(
+                        Icons.fit_screen,
+                        size: 30,
+                        color: isScreenMoving ? Colors.white : Colors.black,
+                      )
+                  ),
+                  IconButton(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/settings');
+                      },
+                      icon: Icon(
+                        Icons.settings,
+                        size: 30,
+                      )),
+                  IconButton(
+                      onPressed: () {
+                        if(isConnected){
+                          setState(() {
+                            socketListener.cancel(); //terminate listening to server
+                            socket.destroy(); //terminate socket connection
+                            pts.clear();
+                            isConnected = false;
+                            isDrawing = false;
+                            isScreenMoving = false;
+                          });
 
-
+                        }else{
+                          createAlertDialog(context).then((value) {
+                            setState(() {
+                              ipAddress = value;
+                              comm();
+                              isConnected = true;
+                            });
+                          });
+                        }
+                      },
+                      icon: Icon(
+                        Icons.bluetooth,
+                        size: 30,
+                        color: isConnected ? Colors.white : Colors.black,
+                      )),
+                ],
+              ),
+            )
         ),
-      ),
+      )
     );
   }
 }
@@ -323,3 +344,4 @@ class DigiPainter extends CustomPainter {
     return true;
   }
 }
+

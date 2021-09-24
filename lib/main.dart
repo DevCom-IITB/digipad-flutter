@@ -1,7 +1,6 @@
 //@dart=2.9
 
 import 'dart:async';
-import 'dart:ffi';
 import 'dart:ui';
 import 'dart:io';
 import 'dart:typed_data';
@@ -10,8 +9,6 @@ import 'dart:convert';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import 'package:digipad/settings.dart';
-import 'package:digipad/socket_manager.dart';
 import 'package:ping_discover_network/ping_discover_network.dart';
 import 'package:wifi/wifi.dart';
 
@@ -63,7 +60,6 @@ class _DigiCanvasState extends State<DigiCanvas> with WidgetsBindingObserver {
   var socket;
   StreamSubscription socketListener;
   String JSONmessage = "";
-  Timer _timer;
   int timerStep = 0;
   int selectedIndex = -1;
 
@@ -195,6 +191,7 @@ class _DigiCanvasState extends State<DigiCanvas> with WidgetsBindingObserver {
                   print(ipAddress);
                   comm();
                   isConnected = true;
+                  Navigator.of(context).pop();
                 });
               },
               child: Text(deviceList[i]),

@@ -1,3 +1,5 @@
+//@dart=2.9
+
 import 'dart:async';
 import 'dart:ffi';
 import 'dart:ui';
@@ -10,6 +12,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:digipad/settings.dart';
 import 'package:digipad/socket_manager.dart';
+import 'package:ping_discover_network/ping_discover_network.dart';
+import 'package:wifi/wifi.dart';
 
 void main() {
   runApp(MaterialApp(
@@ -21,14 +25,13 @@ void main() {
 }
 
 class DigiCanvas extends StatefulWidget {
-  const DigiCanvas({Key? key}) : super(key: key);
+  const DigiCanvas({Key key}) : super(key: key);
 
   @override
   _DigiCanvasState createState() => _DigiCanvasState();
 }
 
 class _DigiCanvasState extends State<DigiCanvas> with WidgetsBindingObserver {
-
   // Automatic detection of orientation change to change window size in desktop
   @override
   void didChangeMetrics() {
@@ -59,39 +62,31 @@ class _DigiCanvasState extends State<DigiCanvas> with WidgetsBindingObserver {
   String ipAddress =
       '192.168.1.6'; //default value for local host while using emulator
   var socket;
-  late StreamSubscription socketListener;
+  StreamSubscription socketListener;
   String JSONmessage = "";
-  Timer? _timer;
+  Timer _timer;
   int timerStep = 0;
+  int selectedIndex = -1;
 
-  void messageManager(String action,[double? dx, double? dy]){
+  void messageManager(String action, [double dx, double dy]) {
     var message;
-    switch(action){
+    switch (action) {
       case "initialize":
         message = {
-          "action":action,
+          "action": action,
           "mobileWidth": (MediaQuery.of(context).size.width).toString(),
           "mobileHeight": (MediaQuery.of(context).size.height).toString(),
         };
         break;
       case "right-click":
       case "left-click":
-        message = {
-          "action": action
-        };
+        message = {"action": action};
         break;
       case "zoom":
-        message = {
-          "action":action,
-          "dx":dx
-        };
+        message = {"action": action, "dx": dx};
         break;
       default: //Move commands
-        message = {
-          "action":action,
-          "dx":dx,
-          "dy":dy
-        };
+        message = {"action": action, "dx": dx, "dy": dy};
         break;
     }
     var jsonMessage = json.encode(message);
@@ -100,6 +95,7 @@ class _DigiCanvasState extends State<DigiCanvas> with WidgetsBindingObserver {
 
   //listen to the server
   void comm() async {
+    print(ipAddress);
     socket = await Socket.connect(ipAddress, 4567);
     print('Connected to: ${socket.remoteAddress.address}:${socket.remotePort}');
 
@@ -126,7 +122,6 @@ class _DigiCanvasState extends State<DigiCanvas> with WidgetsBindingObserver {
         socket.destroy();
       },
     );
-
   }
 
   //send message to the server
@@ -135,188 +130,238 @@ class _DigiCanvasState extends State<DigiCanvas> with WidgetsBindingObserver {
     print('Client: $message');
     //JSONmessage = JSONmessage + message;
     //if(timerStep>10){
-      socket.write(message);
-      //JSONmessage = "";
-      //timerStep = 0;
-      await Future.delayed(Duration(milliseconds:100 ));
+    socket.write(message);
+    //JSONmessage = "";
+    //timerStep = 0;
+    await Future.delayed(Duration(milliseconds: 100));
     //}
-
   }
 
-  Future<dynamic> createAlertDialog(BuildContext context) {
-    TextEditingController controller = new TextEditingController();
+  /*Future<List<String>> getListOfDevices() async {
+    final String ip = await Wifi.ip;
+    print(ip);
+    final String subnet = ip.substring(0, ip.lastIndexOf('.'));
+    print(subnet);
+    final int port = 4567;
 
-    return showDialog(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: Text("IP Address"),
-            content: TextField(
-              controller: controller,
+    List<String> deviceList = [];
+
+    final stream = NetworkAnalyzer.discover2(
+      subnet,
+      port,
+      timeout: Duration(milliseconds: 5000),
+    );
+    stream.listen((NetworkAddress address) {
+      print("It's Showtime");
+      if (address.exists) {
+        print("HEY!\n");
+        deviceList.add(address.ip);
+      }
+    }).onDone(
+      () {
+        print(deviceList);
+        return deviceList;
+      },
+    );
+  }*/
+
+  Future<dynamic> createAlertDialog(BuildContext context) async {
+    //TextEditingController controller = new TextEditingController();
+    final String ip = await Wifi.ip;
+    final String subnet = ip.substring(0, ip.lastIndexOf('.'));
+    final int port = 4567;
+
+    List<String> deviceList = [];
+
+    final stream = NetworkAnalyzer.discover2(
+      subnet,
+      port,
+    );
+    stream.listen((NetworkAddress address) {
+      if (address.exists) {
+        deviceList.add(address.ip);
+      }
+    }).onDone(
+      () {
+        List<Widget> widgetList = [];
+        //print(deviceList);
+
+        for (int i = 0; i < deviceList.length; i++) {
+          widgetList.add(
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  ipAddress = deviceList[i];
+                  //print('IP Address: ');
+                  print(ipAddress);
+                  comm();
+                  isConnected = true;
+                });
+              },
+              child: Text(deviceList[i]),
             ),
-            actions: <Widget>[
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop(controller.text.toString());
-                },
-                child: Text("Connect"),
-              )
-            ],
           );
-        });
+        }
+
+        return showDialog(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: Text("Found Devices"),
+              actions: widgetList,
+            );
+          },
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      extendBody: true,
-      backgroundColor: Colors.redAccent[100],
-      body: GestureDetector(
-          onPanStart: (details) {
-            //TODO Start timer
-            // if(_timer==null){
-            //   _timer = Timer.periodic(Duration(milliseconds: 10), (timer) {
-            //     timerStep++;
-            //   });
-            // }
-            setState(() {
-              final renderBox = context.findRenderObject() as RenderBox;
-              final localPosition =
-                  renderBox.globalToLocal(details.globalPosition);
-              if (isDrawing) {
-                pts.add(localPosition);
-              }
-              var dx = localPosition.dx/renderBox.size.width;
-              var dy = localPosition.dy/renderBox.size.height;
-              messageManager("move",dx,dy);
-            });
-          },
-          onPanUpdate: (details) {
-            setState(() {
-              final renderBox = context.findRenderObject() as RenderBox;
-              final localPosition =
-                  renderBox.globalToLocal(details.globalPosition);
-              var dx = localPosition.dx/renderBox.size.width;
-              var dy = localPosition.dy/renderBox.size.height;
-              if (isDrawing) {
-                pts.add(localPosition);
-                messageManager("drag",dx,dy);
-              } else if(isScreenMoving){
-                messageManager("screen",dx,dy);
-              }
-              else {
-                messageManager("move",dx,dy);
-              }
-            });
-          },
-          onPanEnd: (details) {
-            setState(() {
-              pts.add(Offset.zero);
+        extendBody: true,
+        backgroundColor: Colors.redAccent[100],
+        body: GestureDetector(
+            onPanStart: (details) {
+              //TODO Start timer
               // if(_timer==null){
-              //   _timer!.cancel();
+              //   _timer = Timer.periodic(Duration(milliseconds: 10), (timer) {
+              //     timerStep++;
+              //   });
               // }
-            });
-          },
-          onDoubleTap: (){
-            messageManager("right-click");
-          },
-          onTap: (){
-            messageManager("left-click");
-          },
-
-          child: CustomPaint(
-            painter: DigiPainter(pts),
-            child: Container(
-              height: MediaQuery.of(context).size.height,
-              width: MediaQuery.of(context).size.width,
-            ),
-          )),
-      bottomNavigationBar: FractionallySizedBox(
-        widthFactor: MediaQuery.of(context).orientation == Orientation.portrait ? 1:0.4,
-        alignment: Alignment.bottomLeft,
-        child: Padding(
-            padding: EdgeInsets.all(15.0),
-            child: Container(
-              decoration: BoxDecoration(
-                  borderRadius: BorderRadius.all(Radius.circular(8)),
-                  color: Colors.blue[500]),
-              padding: EdgeInsets.all(MediaQuery.of(context).orientation == Orientation.portrait ? 10:5),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: <Widget>[
-                  IconButton(
-                      onPressed: () {
-                        setState(() {
-                          if(!isScreenMoving){
-                            isDrawing = !isDrawing;
-                            pts.clear();
-                          }else{
-                            isDrawing = true;
-                            isScreenMoving = false;
-                          }
-                        });
-                      },
-                      icon: Icon(
-                        Icons.edit,
-                        size: 30,
-                        color: isDrawing ? Colors.white : Colors.black,
-                      )),
-                  IconButton(
-                      onPressed: () {
-                        setState(() {
-                          isDrawing = false;
-                          isScreenMoving =!isScreenMoving;
-                          pts.clear();
-                        });
-                      },
-                      icon: Icon(
-                        Icons.fit_screen,
-                        size: 30,
-                        color: isScreenMoving ? Colors.white : Colors.black,
-                      )
-                  ),
-                  IconButton(
-                      onPressed: () {
-                        Navigator.pushNamed(context, '/settings');
-                      },
-                      icon: Icon(
-                        Icons.settings,
-                        size: 30,
-                      )),
-                  IconButton(
-                      onPressed: () {
-                        if(isConnected){
-                          setState(() {
-                            socketListener.cancel(); //terminate listening to server
-                            socket.destroy(); //terminate socket connection
-                            pts.clear();
-                            isConnected = false;
-                            isDrawing = false;
-                            isScreenMoving = false;
-                          });
-
-                        }else{
-                          createAlertDialog(context).then((value) {
-                            setState(() {
-                              ipAddress = value;
-                              comm();
-                              isConnected = true;
-                            });
-                          });
-                        }
-                      },
-                      icon: Icon(
-                        Icons.bluetooth,
-                        size: 30,
-                        color: isConnected ? Colors.white : Colors.black,
-                      )),
-                ],
+              setState(() {
+                final renderBox = context.findRenderObject() as RenderBox;
+                final localPosition =
+                    renderBox.globalToLocal(details.globalPosition);
+                if (isDrawing) {
+                  pts.add(localPosition);
+                }
+                var dx = localPosition.dx / renderBox.size.width;
+                var dy = localPosition.dy / renderBox.size.height;
+                messageManager("move", dx, dy);
+              });
+            },
+            onPanUpdate: (details) {
+              setState(() {
+                final renderBox = context.findRenderObject() as RenderBox;
+                final localPosition =
+                    renderBox.globalToLocal(details.globalPosition);
+                var dx = localPosition.dx / renderBox.size.width;
+                var dy = localPosition.dy / renderBox.size.height;
+                if (isDrawing) {
+                  pts.add(localPosition);
+                  messageManager("drag", dx, dy);
+                } else if (isScreenMoving) {
+                  messageManager("screen", dx, dy);
+                } else {
+                  messageManager("move", dx, dy);
+                }
+              });
+            },
+            onPanEnd: (details) {
+              setState(() {
+                pts.add(Offset.zero);
+                // if(_timer==null){
+                //   _timer!.cancel();
+                // }
+              });
+            },
+            onDoubleTap: () {
+              messageManager("right-click");
+            },
+            onTap: () {
+              messageManager("left-click");
+            },
+            child: CustomPaint(
+              painter: DigiPainter(pts),
+              child: Container(
+                height: MediaQuery.of(context).size.height,
+                width: MediaQuery.of(context).size.width,
               ),
-            )
-        ),
-      )
-    );
+            )),
+        bottomNavigationBar: FractionallySizedBox(
+          widthFactor:
+              MediaQuery.of(context).orientation == Orientation.portrait
+                  ? 1
+                  : 0.4,
+          alignment: Alignment.bottomLeft,
+          child: Padding(
+              padding: EdgeInsets.all(15.0),
+              child: Container(
+                decoration: BoxDecoration(
+                    borderRadius: BorderRadius.all(Radius.circular(8)),
+                    color: Colors.blue[500]),
+                padding: EdgeInsets.all(
+                    MediaQuery.of(context).orientation == Orientation.portrait
+                        ? 10
+                        : 5),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: <Widget>[
+                    IconButton(
+                        onPressed: () {
+                          setState(() {
+                            if (!isScreenMoving) {
+                              isDrawing = !isDrawing;
+                              pts.clear();
+                            } else {
+                              isDrawing = true;
+                              isScreenMoving = false;
+                            }
+                          });
+                        },
+                        icon: Icon(
+                          Icons.edit,
+                          size: 30,
+                          color: isDrawing ? Colors.white : Colors.black,
+                        )),
+                    IconButton(
+                        onPressed: () {
+                          setState(() {
+                            isDrawing = false;
+                            isScreenMoving = !isScreenMoving;
+                            pts.clear();
+                          });
+                        },
+                        icon: Icon(
+                          Icons.fit_screen,
+                          size: 30,
+                          color: isScreenMoving ? Colors.white : Colors.black,
+                        )),
+                    IconButton(
+                        onPressed: () {
+                          Navigator.pushNamed(context, '/settings');
+                        },
+                        icon: Icon(
+                          Icons.settings,
+                          size: 30,
+                        )),
+                    IconButton(
+                        onPressed: () {
+                          if (isConnected) {
+                            setState(() {
+                              socketListener
+                                  .cancel(); //terminate listening to server
+                              socket.destroy(); //terminate socket connection
+                              pts.clear();
+                              isConnected = false;
+                              isDrawing = false;
+                              isScreenMoving = false;
+                            });
+                          } else {
+                            createAlertDialog(context);
+                          }
+                        },
+                        icon: Icon(
+                          Icons.bluetooth,
+                          size: 30,
+                          color: isConnected ? Colors.white : Colors.black,
+                        )),
+                  ],
+                ),
+              )),
+        ));
   }
 }
 
@@ -344,4 +389,17 @@ class DigiPainter extends CustomPainter {
     return true;
   }
 }
+/*
 
+createAlertDialog(context).then((value) {
+setState(() {
+print('Value: ');
+print(value);
+ipAddress = value;
+print('IP Address: ');
+print(ipAddress);
+comm();
+isConnected = true;
+});
+});
+*/

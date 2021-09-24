@@ -19,7 +19,6 @@ void main() {
   runApp(MaterialApp(
     routes: {
       '/': (context) => DigiCanvas(),
-      '/settings': (context) => Settings(),
     },
   ));
 }
@@ -317,26 +316,19 @@ class _DigiCanvasState extends State<DigiCanvas> with WidgetsBindingObserver {
                           color: isDrawing ? Colors.white : Colors.black,
                         )),
                     IconButton(
-                        onPressed: () {
-                          setState(() {
-                            isDrawing = false;
-                            isScreenMoving = !isScreenMoving;
-                            pts.clear();
-                          });
-                        },
-                        icon: Icon(
-                          Icons.fit_screen,
-                          size: 30,
-                          color: isScreenMoving ? Colors.white : Colors.black,
-                        )),
-                    IconButton(
-                        onPressed: () {
-                          Navigator.pushNamed(context, '/settings');
-                        },
-                        icon: Icon(
-                          Icons.settings,
-                          size: 30,
-                        )),
+                      onPressed: () {
+                        setState(() {
+                          isDrawing = false;
+                          isScreenMoving = !isScreenMoving;
+                          pts.clear();
+                        });
+                      },
+                      icon: Icon(
+                        Icons.fit_screen,
+                        size: 30,
+                        color: isScreenMoving ? Colors.white : Colors.black,
+                      ),
+                    ),
                     IconButton(
                         onPressed: () {
                           if (isConnected) {
